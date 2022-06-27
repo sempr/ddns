@@ -1,0 +1,118 @@
+package ddns
+
+import (
+	"context"
+	"crypto/sha1"
+	"errors"
+	"fmt"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/go-redis/redis/v8"
+)
+
+const (
+	TokenString string = "token"
+)
+
+type RedisDNSStoreage struct {
+	cli *redis.Client
+	lk  *sync.RWMutex
+}
+
+func NewRedisDNSStorage(cli *redis.Client) *RedisDNSStoreage {
+	var lk sync.RWMutex
+	return &RedisDNSStoreage{cli: cli, lk: &lk}
+}
+
+func (m *RedisDNSStoreage) genToken(hostname string) string {
+	hash := sha1.New()
+	hash.Write([]byte(fmt.Sprintf("%d", time.Now().UnixNano())))
+	hash.Write([]byte(hostname))
+	return fmt.Sprintf("%x", hash.Sum(nil))
+}
+
+func (m *RedisDNSStoreage) New(ctx context.Context, qname string) string {
+	if rs, err := m.cli.HGet(ctx, qname, TokenString).Result(); err != nil || rs == "" {
+		token := m.genToken(qname)
+		if ok, err := m.cli.HSetNX(ctx, qname, TokenString, token).Result(); ok && err == nil {
+			defer m.cli.Expire(ctx, qname, time.Hour*24*180)
+			return token
+		}
+	}
+	return ""
+}
+
+func (m *RedisDNSStoreage) Valid(ctx context.Context, qname string) bool {
+	rs, err := m.cli.HGet(ctx, qname, TokenString).Result()
+	if err != nil || rs == "" {
+		return true
+	}
+	return false
+}
+
+func qtypeToStr(qtype uint16) string {
+	return fmt.Sprintf("x%04x", qtype)
+}
+
+func (m *RedisDNSStoreage) Query(ctx context.Context, qname string, qtype uint16) []string {
+	if ans, err := m.cli.HGet(ctx, qname, qtypeToStr(qtype)).Result(); err == nil {
+		return strings.Split(ans, "|")
+	}
+	return []string{}
+}
+
+func (m *RedisDNSStoreage) Update(ctx context.Context, qname, token string, qtype uint16, val []string) []string {
+	r, err := m.cli.HGet(ctx, qname, TokenString).Result()
+	if err == nil && r == token {
+		qtypeStr := qtypeToStr(qtype)
+		if len(val) > 10 {
+			val = val[len(val)-10:]
+		}
+		m.cli.HSet(ctx, qname, qtypeStr, strings.Join(val, "|")).Result()
+		defer m.cli.Expire(ctx, qname, time.Hour*24*180)
+		return val
+	}
+	return []string{}
+}
+
+func (m *RedisDNSStoreage) Append(ctx context.Context, qname, token string, qtype uint16, val []string) []string {
+	r, err := m.cli.HMGet(ctx, qname, TokenString, qtypeToStr(qtype)).Result()
+	if err == nil && r[0].(string) == token {
+		var old []string
+		if r[1] != nil {
+			old = strings.Split(r[1].(string), "|")
+		}
+		s := make(map[string]bool)
+		for _, v := range old {
+			s[v] = true
+		}
+		for _, v := range val {
+			if _, ok := s[v]; !ok {
+				old = append(old, v)
+				s[v] = true
+			}
+		}
+		if len(old) > 10 {
+			old = old[len(old)-10:]
+		}
+		m.cli.HSet(ctx, qname, qtypeToStr(qtype), strings.Join(old, "|")).Result()
+		defer m.cli.Expire(ctx, qname, time.Hour*24*180)
+		return old
+	}
+	return []string{}
+}
+
+func (m *RedisDNSStoreage) Delete(ctx context.Context, qname, token string) error {
+	r, err := m.cli.HGet(ctx, qname, TokenString).Result()
+	if err != nil {
+		return err
+	}
+	if r == token {
+		_, err = m.cli.Del(ctx, qname).Result()
+		return err
+	} else {
+		return errors.New("token not match")
+	}
+}
