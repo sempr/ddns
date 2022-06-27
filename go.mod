@@ -5,6 +5,7 @@ go 1.18
 require (
 	github.com/gin-gonic/gin v1.8.1
 	github.com/go-redis/redis/v8 v8.11.5
+	github.com/jessevdk/go-flags v1.5.0
 	github.com/miekg/dns v1.1.49
 )
 

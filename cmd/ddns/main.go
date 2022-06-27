@@ -2,32 +2,49 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
 	"time"
 
 	"github.com/go-redis/redis/v8"
+	flags "github.com/jessevdk/go-flags"
 	"github.com/sempr/ddns"
 	"github.com/sempr/ddns/api"
 	"github.com/sempr/ddns/query"
 )
 
 func main() {
-	rdb := redis.NewClient(&redis.Options{Addr: "localhost:6379", Password: "", DB: 0})
+
+	var opts struct {
+		RedisURL string `short:"r" long:"redis" default:"redis://127.0.0.1:6379/0"`
+		HttpPort int    `short:"p" long:"port" default:"8080"`
+		DnsPort  int    `short:"u" long:"udp" default:"5353"`
+		Domain   string `short:"d" long:"domain" default:".ddns.bigking.tk"`
+	}
+
+	flags.ParseArgs(&opts, os.Args)
+	fmt.Println(opts)
+
+	REDIS_URL := opts.RedisURL
+
+	opt, _ := redis.ParseURL(REDIS_URL)
+	rdb := redis.NewClient(opt)
 	defer rdb.Close()
 
 	var s = ddns.NewRedisDNSStorage(rdb)
-	domain := ".ddns.bigking.tk"
+
+	domain := opts.Domain
 	api := api.NewAPIServer(s, "/", domain)
 	query := query.NewDNSQuery(s, domain)
 
 	go func() {
-		api.Run(18099)
+		api.Run(opts.HttpPort)
 	}()
 
 	go func() {
-		query.Run(15353)
+		query.Run(opts.DnsPort)
 	}()
 
 	quit := make(chan os.Signal, 1)
