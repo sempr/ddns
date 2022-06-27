@@ -34,6 +34,8 @@ func (m *RedisDNSStoreage) genToken(hostname string) string {
 }
 
 func (m *RedisDNSStoreage) New(ctx context.Context, qname string) string {
+	m.lk.Lock()
+	defer m.lk.Unlock()
 	if rs, err := m.cli.HGet(ctx, qname, TokenString).Result(); err != nil || rs == "" {
 		token := m.genToken(qname)
 		if ok, err := m.cli.HSetNX(ctx, qname, TokenString, token).Result(); ok && err == nil {
@@ -45,6 +47,8 @@ func (m *RedisDNSStoreage) New(ctx context.Context, qname string) string {
 }
 
 func (m *RedisDNSStoreage) Valid(ctx context.Context, qname string) bool {
+	m.lk.RLock()
+	defer m.lk.RUnlock()
 	rs, err := m.cli.HGet(ctx, qname, TokenString).Result()
 	if err != nil || rs == "" {
 		return true
@@ -57,6 +61,8 @@ func qtypeToStr(qtype uint16) string {
 }
 
 func (m *RedisDNSStoreage) Query(ctx context.Context, qname string, qtype uint16) []string {
+	m.lk.RLock()
+	defer m.lk.RUnlock()
 	if ans, err := m.cli.HGet(ctx, qname, qtypeToStr(qtype)).Result(); err == nil {
 		return strings.Split(ans, "|")
 	}
@@ -64,6 +70,8 @@ func (m *RedisDNSStoreage) Query(ctx context.Context, qname string, qtype uint16
 }
 
 func (m *RedisDNSStoreage) Update(ctx context.Context, qname, token string, qtype uint16, val []string) []string {
+	m.lk.Lock()
+	defer m.lk.Unlock()
 	r, err := m.cli.HGet(ctx, qname, TokenString).Result()
 	if err == nil && r == token {
 		qtypeStr := qtypeToStr(qtype)
@@ -78,6 +86,8 @@ func (m *RedisDNSStoreage) Update(ctx context.Context, qname, token string, qtyp
 }
 
 func (m *RedisDNSStoreage) Append(ctx context.Context, qname, token string, qtype uint16, val []string) []string {
+	m.lk.Lock()
+	defer m.lk.Unlock()
 	r, err := m.cli.HMGet(ctx, qname, TokenString, qtypeToStr(qtype)).Result()
 	if err == nil && r[0].(string) == token {
 		var old []string
@@ -105,6 +115,8 @@ func (m *RedisDNSStoreage) Append(ctx context.Context, qname, token string, qtyp
 }
 
 func (m *RedisDNSStoreage) Delete(ctx context.Context, qname, token string) error {
+	m.lk.Lock()
+	defer m.lk.Unlock()
 	r, err := m.cli.HGet(ctx, qname, TokenString).Result()
 	if err != nil {
 		return err
