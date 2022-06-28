@@ -37,7 +37,7 @@ func (s *APIServer) update(c *gin.Context) {
 		return
 	}
 
-	ipStrings := strings.Split(c.Query("ips"), "|")
+	ipStrings := strings.Split(c.Query("myip"), "|")
 	var ips []net.IP
 	for _, ip_ := range ipStrings {
 		if ip := net.ParseIP(ip_); ip != nil {
