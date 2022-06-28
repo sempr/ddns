@@ -11,7 +11,7 @@ import (
 	"github.com/miekg/dns"
 )
 
-type MemoryDNSStoreage struct {
+type MemoryDNSStorage struct {
 	store map[string]*MemoryRecord
 	lk    *sync.RWMutex
 }
@@ -22,20 +22,20 @@ type MemoryRecord struct {
 	AAAA  []string
 }
 
-func NewMemoryDNSStorage() *MemoryDNSStoreage {
+func NewMemoryDNSStorage() *MemoryDNSStorage {
 	m := make(map[string]*MemoryRecord)
 	var lk sync.RWMutex
-	return &MemoryDNSStoreage{store: m, lk: &lk}
+	return &MemoryDNSStorage{store: m, lk: &lk}
 }
 
-func (m *MemoryDNSStoreage) genToken(hostname string) string {
+func (m *MemoryDNSStorage) genToken(hostname string) string {
 	hash := sha1.New()
 	hash.Write([]byte(fmt.Sprintf("%d", time.Now().UnixNano())))
 	hash.Write([]byte(hostname))
 	return fmt.Sprintf("%x", hash.Sum(nil))
 }
 
-func (m *MemoryDNSStoreage) New(ctx context.Context, qname string) string {
+func (m *MemoryDNSStorage) New(ctx context.Context, qname string) string {
 	if _, ok := (m.store)[qname]; !ok {
 		a := new(MemoryRecord)
 		a.Token = m.genToken(qname)
@@ -45,12 +45,12 @@ func (m *MemoryDNSStoreage) New(ctx context.Context, qname string) string {
 	return ""
 }
 
-func (m *MemoryDNSStoreage) Valid(ctx context.Context, qname string) bool {
+func (m *MemoryDNSStorage) Valid(ctx context.Context, qname string) bool {
 	_, ok := (m.store)[qname]
 	return !ok
 }
 
-func (m *MemoryDNSStoreage) Delete(ctx context.Context, qname, token string) error {
+func (m *MemoryDNSStorage) Delete(ctx context.Context, qname, token string) error {
 	if r, ok := (m.store)[qname]; ok && r != nil && r.Token == token {
 		delete(m.store, qname)
 		return nil
@@ -58,7 +58,7 @@ func (m *MemoryDNSStoreage) Delete(ctx context.Context, qname, token string) err
 	return errors.New("token not match")
 }
 
-func (m *MemoryDNSStoreage) Query(ctx context.Context, qname string, qtype uint16) []string {
+func (m *MemoryDNSStorage) Query(ctx context.Context, qname string, qtype uint16) []string {
 	if r, ok := (m.store)[qname]; ok {
 		switch qtype {
 		case dns.TypeA:
@@ -70,7 +70,7 @@ func (m *MemoryDNSStoreage) Query(ctx context.Context, qname string, qtype uint1
 	return []string{}
 }
 
-func (m *MemoryDNSStoreage) Update(ctx context.Context, qname, token string, qtype uint16, val []string) []string {
+func (m *MemoryDNSStorage) Update(ctx context.Context, qname, token string, qtype uint16, val []string) []string {
 	if r, ok := (m.store)[qname]; ok && r != nil && r.Token == token {
 		switch qtype {
 		case dns.TypeA:
@@ -84,7 +84,7 @@ func (m *MemoryDNSStoreage) Update(ctx context.Context, qname, token string, qty
 	return []string{}
 }
 
-func (m *MemoryDNSStoreage) Append(ctx context.Context, qname, token string, qtype uint16, val []string) []string {
+func (m *MemoryDNSStorage) Append(ctx context.Context, qname, token string, qtype uint16, val []string) []string {
 	if r, ok := (m.store)[qname]; ok && r != nil && r.Token == token {
 		switch qtype {
 		case dns.TypeA:

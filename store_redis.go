@@ -16,24 +16,24 @@ const (
 	TokenString string = "token"
 )
 
-type RedisDNSStoreage struct {
+type RedisDNSStorage struct {
 	cli *redis.Client
 	lk  *sync.RWMutex
 }
 
-func NewRedisDNSStorage(cli *redis.Client) *RedisDNSStoreage {
+func NewRedisDNSStorage(cli *redis.Client) *RedisDNSStorage {
 	var lk sync.RWMutex
-	return &RedisDNSStoreage{cli: cli, lk: &lk}
+	return &RedisDNSStorage{cli: cli, lk: &lk}
 }
 
-func (m *RedisDNSStoreage) genToken(hostname string) string {
+func (m *RedisDNSStorage) genToken(hostname string) string {
 	hash := sha1.New()
 	hash.Write([]byte(fmt.Sprintf("%d", time.Now().UnixNano())))
 	hash.Write([]byte(hostname))
 	return fmt.Sprintf("%x", hash.Sum(nil))
 }
 
-func (m *RedisDNSStoreage) New(ctx context.Context, qname string) string {
+func (m *RedisDNSStorage) New(ctx context.Context, qname string) string {
 	m.lk.Lock()
 	defer m.lk.Unlock()
 	if rs, err := m.cli.HGet(ctx, qname, TokenString).Result(); err != nil || rs == "" {
@@ -46,7 +46,7 @@ func (m *RedisDNSStoreage) New(ctx context.Context, qname string) string {
 	return ""
 }
 
-func (m *RedisDNSStoreage) Valid(ctx context.Context, qname string) bool {
+func (m *RedisDNSStorage) Valid(ctx context.Context, qname string) bool {
 	m.lk.RLock()
 	defer m.lk.RUnlock()
 	rs, err := m.cli.HGet(ctx, qname, TokenString).Result()
@@ -60,7 +60,7 @@ func qtypeToStr(qtype uint16) string {
 	return fmt.Sprintf("x%04x", qtype)
 }
 
-func (m *RedisDNSStoreage) Query(ctx context.Context, qname string, qtype uint16) []string {
+func (m *RedisDNSStorage) Query(ctx context.Context, qname string, qtype uint16) []string {
 	m.lk.RLock()
 	defer m.lk.RUnlock()
 	if ans, err := m.cli.HGet(ctx, qname, qtypeToStr(qtype)).Result(); err == nil {
@@ -69,7 +69,7 @@ func (m *RedisDNSStoreage) Query(ctx context.Context, qname string, qtype uint16
 	return []string{}
 }
 
-func (m *RedisDNSStoreage) Update(ctx context.Context, qname, token string, qtype uint16, val []string) []string {
+func (m *RedisDNSStorage) Update(ctx context.Context, qname, token string, qtype uint16, val []string) []string {
 	m.lk.Lock()
 	defer m.lk.Unlock()
 	r, err := m.cli.HGet(ctx, qname, TokenString).Result()
@@ -85,7 +85,7 @@ func (m *RedisDNSStoreage) Update(ctx context.Context, qname, token string, qtyp
 	return []string{}
 }
 
-func (m *RedisDNSStoreage) Append(ctx context.Context, qname, token string, qtype uint16, val []string) []string {
+func (m *RedisDNSStorage) Append(ctx context.Context, qname, token string, qtype uint16, val []string) []string {
 	m.lk.Lock()
 	defer m.lk.Unlock()
 	r, err := m.cli.HMGet(ctx, qname, TokenString, qtypeToStr(qtype)).Result()
@@ -114,7 +114,7 @@ func (m *RedisDNSStoreage) Append(ctx context.Context, qname, token string, qtyp
 	return []string{}
 }
 
-func (m *RedisDNSStoreage) Delete(ctx context.Context, qname, token string) error {
+func (m *RedisDNSStorage) Delete(ctx context.Context, qname, token string) error {
 	m.lk.Lock()
 	defer m.lk.Unlock()
 	r, err := m.cli.HGet(ctx, qname, TokenString).Result()
