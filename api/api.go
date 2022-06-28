@@ -126,7 +126,7 @@ func (s *APIServer) delete(c *gin.Context) {
 
 }
 
-func (s *APIServer) Run(port int) error {
+func (s *APIServer) Run(bind string) error {
 	r := gin.Default()
 	r.SetHTMLTemplate(buildTemplate())
 	r.GET("/", s.home)
@@ -134,9 +134,9 @@ func (s *APIServer) Run(port int) error {
 	r.DELETE("/update/:hostname/:token", s.delete)
 	r.GET("/new/:hostname", s.new)
 	r.GET("/available/:hostname", s.available)
-	log.Printf("start http server on port %d", port)
+	log.Printf("start http server on port %s", bind)
 	srv := &http.Server{
-		Addr:    fmt.Sprintf(":%d", port),
+		Addr:    bind,
 		Handler: r,
 	}
 	s.srv = srv

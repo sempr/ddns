@@ -19,7 +19,7 @@ func main() {
 
 	var opts struct {
 		RedisURL string `short:"r" long:"redis" default:"redis://127.0.0.1:6379/0"`
-		HttpPort int    `short:"p" long:"port" default:"8080"`
+		HttpBind string `short:"b" long:"bind" default:"127.0.0.1:8080"`
 		DnsPort  int    `short:"u" long:"udp" default:"5353"`
 		Domain   string `short:"d" long:"domain" default:".ddns.bigking.tk"`
 	}
@@ -40,7 +40,7 @@ func main() {
 	query := query.NewDNSQuery(s, domain)
 
 	go func() {
-		api.Run(opts.HttpPort)
+		api.Run(opts.HttpBind)
 	}()
 
 	go func() {

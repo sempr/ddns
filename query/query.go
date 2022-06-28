@@ -47,14 +47,14 @@ func (s *DNSQuery) parseQuery(m *dns.Msg) {
 			ans := s.store.Query(context.TODO(), hostname, q.Qtype)
 
 			for _, r := range ans {
-				rr, err := dns.NewRR(fmt.Sprintf("%s A %s", q.Name, r))
+				rr, err := dns.NewRR(fmt.Sprintf("%s 30 IN A %s", q.Name, r))
 				if err == nil {
 					m.Answer = append(m.Answer, rr)
 				}
 			}
 		case dns.TypeTXT:
 			log.Printf("Query TXT for %s\n", q.Name)
-			rr, err := dns.NewRR(fmt.Sprintf("%s TXT %s", q.Name, "Hello,world!"))
+			rr, err := dns.NewRR(fmt.Sprintf("%s 30 IN TXT %s", q.Name, "Hello,world!"))
 			if err == nil {
 				m.Answer = append(m.Answer, rr)
 				m.Answer = append(m.Answer, rr)
@@ -65,7 +65,7 @@ func (s *DNSQuery) parseQuery(m *dns.Msg) {
 			ans := s.store.Query(context.TODO(), hostname, q.Qtype)
 
 			for _, r := range ans {
-				rr, err := dns.NewRR(fmt.Sprintf("%s AAAA %s", q.Name, r))
+				rr, err := dns.NewRR(fmt.Sprintf("%s 30 IN AAAA %s", q.Name, r))
 				if err == nil {
 					m.Answer = append(m.Answer, rr)
 				}
